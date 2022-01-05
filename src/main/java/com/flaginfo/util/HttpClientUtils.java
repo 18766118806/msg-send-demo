@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
@@ -21,9 +20,7 @@ import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 
 import javax.net.ssl.SSLContext;
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.Iterator;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -66,7 +63,7 @@ public class HttpClientUtils {
     }
 
 
-    public static String doPostWithHeader(String url, Map<String, Object> params, Map<String, Object> headers) throws IOException {
+    public static String doPostWithHeader(String url, Map<String, Object> params, Map<String, Object> headers) {
         try {
             CloseableHttpClient httpClient = getHttpClient();
             HttpPost httpPost = new HttpPost(url);
@@ -77,7 +74,7 @@ public class HttpClientUtils {
                 httpPost.setHeader((String) ((Entry) stringObjectEntry).getKey(), (String) stringObjectEntry.getValue());
             }
 
-            StringEntity strEntity = new StringEntity(JSON.toJSONString(params), Charset.defaultCharset());
+            StringEntity strEntity = new StringEntity(JSON.toJSONString(params), StandardCharsets.UTF_8);
             httpPost.setEntity(strEntity);
             httpPost.setConfig(requestConfig);
             CloseableHttpResponse response = httpClient.execute(httpPost);
