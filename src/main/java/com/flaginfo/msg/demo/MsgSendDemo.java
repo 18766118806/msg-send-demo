@@ -53,7 +53,7 @@ public class MsgSendDemo {
         reqBody.put("phones", phones);
         reqBody.put("templateCode", templateCode);
         // 无参模板不要要该参数,模板有参数时,放开下面一行代码
-        reqBody.put("templateParam", templateParam);
+        //reqBody.put("templateParam", templateParam);
 
 
         // 3 .生成签名 ,并把签名加入请求头
