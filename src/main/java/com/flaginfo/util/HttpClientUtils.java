@@ -11,6 +11,7 @@ import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -21,45 +22,23 @@ import org.apache.http.util.EntityUtils;
 
 import javax.net.ssl.SSLContext;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 
-/**
- * @author: yajun.xu@infocloud.cc
- * @data: 2021/08/24 14:32
- * @description: todo
- */
 @Slf4j
 public class HttpClientUtils {
     static final PoolingHttpClientConnectionManager cm;
     static RequestConfig requestConfig;
 
-    static {
-        LayeredConnectionSocketFactory factory = null;
-        try {
-            SSLContext sslContext = SSLContexts.custom()
-                    .loadTrustMaterial((chain, authType) -> true).build();
-            factory = new SSLConnectionSocketFactory(sslContext);
-
-        } catch (Exception e) {
-            log.error("连接池初始化失败", e);
-        }
-        assert factory != null;
-        Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
-                .register("https", factory)
-                .register("http", new PlainConnectionSocketFactory())
-                .build();
-        cm = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
-        cm.setMaxTotal(200);
-        cm.setDefaultMaxPerRoute(20);
-
-        requestConfig = RequestConfig.custom().setConnectionRequestTimeout(30000).setConnectTimeout(30000).setSocketTimeout(30000).build();
-
+    private HttpClientUtils() {
     }
 
     private static CloseableHttpClient getHttpClient() {
-        return HttpClients.custom().setConnectionManager(cm)
-                .build();
+        CloseableHttpClient httpClient = HttpClients.custom().disableConnectionState().disableAutomaticRetries()
+                .setConnectionManager(cm).build();
+        return httpClient;
     }
 
 
@@ -69,9 +48,11 @@ public class HttpClientUtils {
             HttpPost httpPost = new HttpPost(url);
             httpPost.setHeader("Accept", "application/json; charset=UTF-8");
             httpPost.setHeader("Content-Type", "application/json; charset=UTF-8");
+            Iterator var5 = headers.entrySet().iterator();
 
-            for (Entry<String, Object> stringObjectEntry : headers.entrySet()) {
-                httpPost.setHeader((String) ((Entry) stringObjectEntry).getKey(), (String) stringObjectEntry.getValue());
+            while (var5.hasNext()) {
+                Entry<String, String> entry = (Entry) var5.next();
+                httpPost.setHeader(entry.getKey(), entry.getValue());
             }
 
             StringEntity strEntity = new StringEntity(JSON.toJSONString(params), StandardCharsets.UTF_8);
@@ -83,10 +64,35 @@ public class HttpClientUtils {
             EntityUtils.consume(entity);
             return content;
         } catch (Exception var10) {
-            log.error("ERROR, call http post" + var10.getMessage(), var10);
+//            log.error("ERROR, call http post" + var10.getMessage(), var10);
+            var10.printStackTrace();
             return null;
         }
     }
 
+    static {
+        LayeredConnectionSocketFactory factory = null;
+        try {
+            SSLContext sslContext = SSLContexts.custom().loadTrustMaterial((chain, authType) -> true).build();
 
+            factory = new SSLConnectionSocketFactory(sslContext,
+//					new String[] { "SSLv2Hello", "SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2" }, null,
+                    new String[]{"TLSv1.2"}, null,
+                    NoopHostnameVerifier.INSTANCE);
+//			SSLConnectionSocketFactory.getDefaultHostnameVerifier());
+
+        } catch (Exception e) {
+//            log.error("连接池初始化失败",e);
+            e.printStackTrace();
+        }
+        Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
+                .register("https", factory).register("http", new PlainConnectionSocketFactory()).build();
+        //设置持久链接的存活时间TTL（timeToLive），其定义了持久连接的最大使用时间，超过其TTL值的链接不会再被复用
+        cm = new PoolingHttpClientConnectionManager(socketFactoryRegistry, null, null, null, 60, TimeUnit.SECONDS);
+        cm.setMaxTotal(200);
+        cm.setDefaultMaxPerRoute(20);
+        cm.setValidateAfterInactivity(1000);
+        requestConfig = RequestConfig.custom().setConnectionRequestTimeout(30000).setConnectTimeout(30000)
+                .setSocketTimeout(30000).build();
+    }
 }
